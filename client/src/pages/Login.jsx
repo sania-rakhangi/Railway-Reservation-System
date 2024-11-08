@@ -1,6 +1,6 @@
 import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { postData } from "../utils/api";
-import { useNavigate } from "react-router-dom";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -13,8 +13,8 @@ export default function Login() {
     try {
       const response = await postData("/auth/login", { username, password });
       if (response.token) {
-        localStorage.setItem("token", response.token); // Store token for authentication
-        navigate("/dashboard"); // Redirect to dashboard after login
+        localStorage.setItem("token", response.token);
+        navigate("/dashboard");
       } else {
         setError(response.message || "Invalid credentials");
       }
@@ -51,6 +51,13 @@ export default function Login() {
         >
           Login
         </button>
+        <p className="mt-4 text-center">
+          Don’t have an account?{" "}
+          <Link to="/signup" className="text-blue-500">
+            Sign up here
+          </Link>
+          .
+        </p>
       </form>
     </div>
   );

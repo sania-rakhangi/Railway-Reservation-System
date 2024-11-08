@@ -1,5 +1,5 @@
-import React, { useState } from "react";
 import { postData } from "../utils/api";
+import { useState } from "react";
 
 export default function SearchTrains() {
   const [origin, setOrigin] = useState("");

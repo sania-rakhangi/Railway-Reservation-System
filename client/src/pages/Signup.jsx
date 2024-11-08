@@ -1,19 +1,18 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { postData } from "../utils/api";
 
 export default function Signup() {
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-    email: "",
-  });
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
-    // Handle signup logic (e.g., API call)
+    const response = await postData("/auth/signup", { username, password });
+    if (response.success) {
+      navigate("/");
+    }
   };
 
   return (
@@ -25,26 +24,16 @@ export default function Signup() {
         <h2 className="text-2xl font-bold mb-4">Sign Up</h2>
         <input
           type="text"
-          name="username"
           placeholder="Username"
-          value={formData.username}
-          onChange={handleChange}
-          className="w-full mb-4 p-2 border rounded"
-        />
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={handleChange}
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           className="w-full mb-4 p-2 border rounded"
         />
         <input
           type="password"
-          name="password"
           placeholder="Password"
-          value={formData.password}
-          onChange={handleChange}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
           className="w-full mb-4 p-2 border rounded"
         />
         <button
@@ -53,6 +42,13 @@ export default function Signup() {
         >
           Sign Up
         </button>
+        <p className="mt-4 text-center">
+          Already have an account?{" "}
+          <Link to="/" className="text-blue-500">
+            Log in here
+          </Link>
+          .
+        </p>
       </form>
     </div>
   );
