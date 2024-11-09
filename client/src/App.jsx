@@ -1,41 +1,42 @@
+// App.jsx
+import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Dashboard from "./pages/Dashboard";
-import SearchTrains from "./pages/SearchTrains";
-import BookedTickets from "./pages/BookedTickets";
-import ProtectedRoute from "./components/ProtectedRoute";
+import NavBar from "./components/NavBar";
+import SignupForm from "./components/SignupForm";
+import LoginForm from "./components/LoginForm";
+import HomePage from "./components/HomePage";
+import SearchTrains from "./components/SearchTrains";
+import BookTicket from "./components/BookTicket";
 
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const onLogin = (token) => {
+    localStorage.setItem("token", token);
+    setIsLoggedIn(true);
+  };
+
+  const onLogout = () => {
+    localStorage.removeItem("token");
+    setIsLoggedIn(false);
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
   return (
     <Router>
+      <NavBar isLoggedIn={isLoggedIn} onLogout={onLogout} />
       <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/search-trains"
-          element={
-            <ProtectedRoute>
-              <SearchTrains />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/booked-tickets"
-          element={
-            <ProtectedRoute>
-              <BookedTickets />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/signup" element={<SignupForm onLogin={onLogin} />} />
+        <Route path="/login" element={<LoginForm onLogin={onLogin} />} />
+        <Route path="/search-trains" element={<SearchTrains />} />
+        <Route path="/book-ticket/:trainId" element={<BookTicket />} />
       </Routes>
     </Router>
   );
