@@ -1,3 +1,4 @@
+// App.jsx
 import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import NavBar from "./components/NavBar";
@@ -6,7 +7,6 @@ import LoginForm from "./components/LoginForm";
 import HomePage from "./components/HomePage";
 import SearchTrains from "./components/SearchTrains";
 import BookTicket from "./components/BookTicket";
-import MyBookings from "./components/MyBookings"; // Import MyBookings component
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -37,7 +37,6 @@ function App() {
         <Route path="/login" element={<LoginForm onLogin={onLogin} />} />
         <Route path="/search-trains" element={<SearchTrains />} />
         <Route path="/book-ticket/:trainId" element={<BookTicket />} />
-        <Route path="/my-bookings" element={<MyBookings />} />{" "}
       </Routes>
     </Router>
   );

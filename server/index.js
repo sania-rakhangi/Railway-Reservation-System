@@ -93,64 +93,91 @@ app.post("/login", (req, res) => {
   );
 });
 
-// Search trains route
+// Endpoint to search for trains
 app.get("/search-trains", (req, res) => {
   const { origin, destination, date } = req.query;
 
+  // SQL query to fetch available trains based on origin, destination, and date
   const query = `
-      SELECT trains.train_id, trains.name, trains.origin, trains.destination,
-             schedules.departure_time, schedules.arrival_time
-      FROM trains
-      JOIN schedules ON trains.train_id = schedules.train_id
-      WHERE trains.origin = ? AND trains.destination = ? AND DATE(schedules.departure_time) = ?
-    `;
+    SELECT t.train_id, t.name, t.train_number, s.departure_time, s.arrival_time, t.available_seats
+    FROM schedules s
+    JOIN trains t ON s.train_id = t.train_id
+    JOIN stations o ON s.origin_station_id = o.station_id
+    JOIN stations d ON s.destination_station_id = d.station_id
+    WHERE o.name = ? AND d.name = ? AND DATE(s.departure_time) = ? AND t.available_seats > 0;
+  `;
 
   db.query(query, [origin, destination, date], (err, results) => {
     if (err) {
-      console.error("Error searching trains:", err);
-      return res.status(500).json({ error: "Error fetching trains" });
+      console.error("Error searching for trains:", err);
+      return res.status(500).json({ error: "Database error" });
     }
     res.json({ trains: results });
   });
 });
 
-// Book ticket route
-app.post("/book-ticket", (req, res) => {
-  const { userId, trainId, scheduleId, passengerName, age, seatType } =
-    req.body;
+// Endpoint to book a ticket
+app.post("/book-ticket/:trainId", (req, res) => {
+  const { trainId } = req.params;
+  const { userId, passengerName, age, seatType } = req.body;
 
-  // Step 1: Insert the reservation into the reservations table
-  const insertReservationQuery = `
-      INSERT INTO reservations (user_id, train_id, schedule_id, passenger_name, age, seat_type)
-      VALUES (?, ?, ?, ?, ?, ?);
+  // Begin a transaction
+  db.beginTransaction((err) => {
+    if (err) {
+      return res.status(500).json({ error: "Transaction failed" });
+    }
+
+    // Update available seats for the selected train
+    const updateSeatsQuery = `
+      UPDATE trains
+      SET available_seats = available_seats - 1
+      WHERE train_id = ? AND available_seats > 0;
     `;
-
-  db.query(
-    insertReservationQuery,
-    [userId, trainId, scheduleId, passengerName, age, seatType],
-    (err, result) => {
-      if (err) {
-        console.error("Error booking ticket:", err);
-        return res.status(500).json({ error: "Error processing booking" });
+    db.query(updateSeatsQuery, [trainId], (err, result) => {
+      if (err || result.affectedRows === 0) {
+        return db.rollback(() => {
+          console.error("Error updating seats or no available seats:", err);
+          return res
+            .status(400)
+            .json({ error: "No available seats or error updating seats" });
+        });
       }
 
-      // Step 2: Reduce available seats in the train
-      const updateSeatsQuery = `
-        UPDATE trains
-        SET available_seats = available_seats - 1
-        WHERE train_id = ? AND available_seats > 0;
+      // Insert the booking information into the reservations table
+      const insertReservationQuery = `
+        INSERT INTO reservations (user_id, schedule_id, passenger_name, age, seat_type)
+        VALUES (?, ?, ?, ?, ?);
       `;
+      const scheduleId = req.body.scheduleId; // Schedule ID should be provided from the frontend or fetched
+      db.query(
+        insertReservationQuery,
+        [userId, scheduleId, passengerName, age, seatType],
+        (err, result) => {
+          if (err) {
+            return db.rollback(() => {
+              console.error("Error inserting reservation:", err);
+              return res
+                .status(500)
+                .json({ error: "Error processing booking" });
+            });
+          }
 
-      db.query(updateSeatsQuery, [trainId], (err, result) => {
-        if (err) {
-          console.error("Error updating seats:", err);
-          return res.status(500).json({ error: "Error updating seats" });
+          // Commit the transaction
+          db.commit((err) => {
+            if (err) {
+              return db.rollback(() => {
+                console.error("Error committing transaction:", err);
+                return res
+                  .status(500)
+                  .json({ error: "Booking transaction failed" });
+              });
+            }
+            res.json({ success: true, message: "Ticket booked successfully" });
+          });
         }
-
-        res.json({ success: true, message: "Ticket booked successfully!" });
-      });
-    }
-  );
+      );
+    });
+  });
 });
 
 // Endpoint to retrieve all bookings for a user

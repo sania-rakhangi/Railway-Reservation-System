@@ -1,79 +1,58 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 
-function BookingTicket() {
-  const { trainId } = useParams(); // Retrieve trainId from URL params
-  const [trainDetails, setTrainDetails] = useState({});
-  const [bookingData, setBookingData] = useState({
+function BookTicket() {
+  const { trainId } = useParams(); // Extract trainId from URL
+  const navigate = useNavigate();
+
+  // Initial state for the form
+  const [formData, setFormData] = useState({
     passengerName: "",
     age: "",
-    seatType: "",
+    seatType: "Economy", // Default seat type
   });
-  const [userId, setUserId] = useState(null); // Will be set dynamically, or from localStorage or state
-
-  useEffect(() => {
-    // Fetch train details using trainId
-    const fetchTrainDetails = async () => {
-      try {
-        const response = await axios.get(
-          `http://localhost:5000/train-details/${trainId}`
-        );
-        setTrainDetails(response.data);
-      } catch (error) {
-        console.error("Error fetching train details:", error);
-      }
-    };
-    fetchTrainDetails();
-  }, [trainId]);
-
-  // Set user ID, you can adjust this to pull from the localStorage or context
-  useEffect(() => {
-    const storedUserId = localStorage.getItem("userId"); // Fetch userId from localStorage (or state/context)
-    if (storedUserId) {
-      setUserId(storedUserId);
-    } else {
-      // Handle case when userId is not available (redirect to login or show error)
-      alert("User not logged in.");
-    }
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setBookingData({ ...bookingData, [name]: value });
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      [name]: value,
+    }));
   };
 
   const handleBooking = async (e) => {
     e.preventDefault();
 
-    const { passengerName, age, seatType } = bookingData;
-
-    if (!passengerName || !age || !seatType) {
-      alert("Please fill out all fields");
+    // Validation: Check if all fields are filled
+    if (!formData.passengerName || !formData.age || !formData.seatType) {
+      alert("Please fill all fields.");
       return;
     }
 
-    console.log("Booking data:", bookingData);
-    console.log("Train details:", trainDetails);
+    // Convert age to a number to ensure it is valid
+    const age = Number(formData.age);
+    if (isNaN(age) || age <= 0) {
+      alert("Please enter a valid age.");
+      return;
+    }
 
+    // Attempt to send booking request to the backend
     try {
-      const response = await axios.post("http://localhost:5000/book-ticket", {
-        userId,
-        trainId,
-        scheduleId: trainDetails.scheduleId, // Ensure this is passed dynamically from trainDetails
-        passengerName,
-        age,
-        seatType,
-      });
-
-      alert(response.data.message);
-    } catch (error) {
-      console.error("Error booking the ticket:", error);
-      alert(
-        error.response
-          ? error.response.data.message
-          : "Failed to book ticket. Please try again."
+      const response = await axios.post(
+        `http://localhost:5000/book-ticket/${trainId}`,
+        formData
       );
+
+      // Handle successful booking response
+      if (response.status === 200) {
+        alert("Ticket booked successfully!");
+        navigate("/"); // Redirect to the home page or reservation page
+      }
+    } catch (error) {
+      // Handle booking failure
+      console.error("Error booking ticket:", error);
+      alert("Failed to book ticket. Please try again.");
     }
   };
 
@@ -82,61 +61,59 @@ function BookingTicket() {
       <h2 className="text-3xl font-bold text-gray-800 mb-6">
         Book Your Ticket
       </h2>
-      {trainDetails.name ? (
-        <div className="bg-white shadow-lg rounded-lg p-6 w-3/4 lg:w-1/2">
-          <h3 className="text-xl font-semibold mb-4">{trainDetails.name}</h3>
-          <form onSubmit={handleBooking} className="space-y-4">
-            <div>
-              <label className="block text-gray-700">Passenger Name</label>
-              <input
-                type="text"
-                name="passengerName"
-                value={bookingData.passengerName}
-                onChange={handleChange}
-                required
-                className="w-full p-2 border border-gray-300 rounded mt-1"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-700">Age</label>
-              <input
-                type="number"
-                name="age"
-                value={bookingData.age}
-                onChange={handleChange}
-                required
-                className="w-full p-2 border border-gray-300 rounded mt-1"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-700">Seat Type</label>
-              <select
-                name="seatType"
-                value={bookingData.seatType}
-                onChange={handleChange}
-                required
-                className="w-full p-2 border border-gray-300 rounded mt-1"
-              >
-                <option value="">Select Seat Type</option>
-                <option value="Sleeper">Sleeper</option>
-                <option value="Second AC">Second AC</option>
-                <option value="Third AC">Third AC</option>
-                <option value="First AC">First AC</option>
-              </select>
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700"
-            >
-              Book Ticket
-            </button>
-          </form>
+
+      {/* Booking form */}
+      <form
+        onSubmit={handleBooking}
+        className="bg-white shadow-lg rounded-lg p-6 w-3/4 lg:w-1/2 space-y-4"
+      >
+        <div>
+          <label className="block text-gray-700">Passenger Name</label>
+          <input
+            type="text"
+            name="passengerName"
+            value={formData.passengerName}
+            onChange={handleChange}
+            required
+            className="w-full p-2 border border-gray-300 rounded mt-1"
+          />
         </div>
-      ) : (
-        <p className="text-gray-600">Loading train details...</p>
-      )}
+
+        <div>
+          <label className="block text-gray-700">Age</label>
+          <input
+            type="number"
+            name="age"
+            value={formData.age}
+            onChange={handleChange}
+            required
+            className="w-full p-2 border border-gray-300 rounded mt-1"
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-700">Seat Type</label>
+          <select
+            name="seatType"
+            value={formData.seatType}
+            onChange={handleChange}
+            className="w-full p-2 border border-gray-300 rounded mt-1"
+          >
+            <option value="Economy">Economy</option>
+            <option value="Business">Business</option>
+            <option value="First Class">First Class</option>
+          </select>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700"
+        >
+          Confirm Booking
+        </button>
+      </form>
     </div>
   );
 }
 
-export default BookingTicket;
+export default BookTicket;
