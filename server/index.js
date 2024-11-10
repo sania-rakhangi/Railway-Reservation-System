@@ -83,8 +83,10 @@ app.post("/login", (req, res) => {
         return res.status(400).json({ message: "Invalid email or password" });
       }
 
+      console.log("User logged in:", user);
+
       // Generate JWT Token
-      const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+      const token = jwt.sign({ id: user.user_id }, process.env.JWT_SECRET, {
         expiresIn: "1h",
       });
 
@@ -96,6 +98,8 @@ app.post("/login", (req, res) => {
 // Endpoint to search for trains
 app.get("/search-trains", (req, res) => {
   const { origin, destination, date } = req.query;
+
+  console.log("Search parameters:", origin, destination, date);
 
   // SQL query to fetch available trains based on origin, destination, and date
   const query = `
@@ -112,6 +116,8 @@ app.get("/search-trains", (req, res) => {
       console.error("Error searching for trains:", err);
       return res.status(500).json({ error: "Database error" });
     }
+
+    console.log("Search results:", results);
     res.json({ trains: results });
   });
 });
@@ -119,66 +125,95 @@ app.get("/search-trains", (req, res) => {
 // Endpoint to book a ticket
 app.post("/book-ticket/:trainId", (req, res) => {
   const { trainId } = req.params;
-  const { userId, passengerName, age, seatType } = req.body;
+  const { passengerName, age, seatType } = req.body;
+  const token = req.header('x-auth-token');
 
-  // Begin a transaction
-  db.beginTransaction((err) => {
-    if (err) {
-      return res.status(500).json({ error: "Transaction failed" });
-    }
+  if (!token) {
+    return res.status(401).json({ error: "No token provided" });
+  }
 
-    // Update available seats for the selected train
-    const updateSeatsQuery = `
-      UPDATE trains
-      SET available_seats = available_seats - 1
-      WHERE train_id = ? AND available_seats > 0;
-    `;
-    db.query(updateSeatsQuery, [trainId], (err, result) => {
-      if (err || result.affectedRows === 0) {
-        return db.rollback(() => {
-          console.error("Error updating seats or no available seats:", err);
-          return res
-            .status(400)
-            .json({ error: "No available seats or error updating seats" });
-        });
+  // console.log("Booking parameters:", trainId, passengerName, age, seatType)
+  console.log("Token:", token);
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    console.log("Booking parameters:", decoded, trainId, passengerName, age, seatType);
+
+    // Begin a transaction
+    db.beginTransaction((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Transaction failed" });
       }
 
-      // Insert the booking information into the reservations table
-      const insertReservationQuery = `
-        INSERT INTO reservations (user_id, schedule_id, passenger_name, age, seat_type)
-        VALUES (?, ?, ?, ?, ?);
+      // Fetch the schedule_id using train_id
+      const fetchScheduleQuery = `
+        SELECT schedule_id FROM schedules
+        WHERE train_id = ?;
       `;
-      const scheduleId = req.body.scheduleId; // Schedule ID should be provided from the frontend or fetched
-      db.query(
-        insertReservationQuery,
-        [userId, scheduleId, passengerName, age, seatType],
-        (err, result) => {
-          if (err) {
+      db.query(fetchScheduleQuery, [trainId], (err, scheduleResults) => {
+        if (err || scheduleResults.length === 0) {
+          return db.rollback(() => {
+            console.error("Error fetching schedule or no schedule found:", err);
+            return res.status(400).json({ error: "No schedule found for the specified train" });
+          });
+        }
+
+        const scheduleId = scheduleResults[0].schedule_id;
+
+        // Update available seats for the selected train
+        const updateSeatsQuery = `
+          UPDATE trains
+          SET available_seats = available_seats - 1
+          WHERE train_id = ? AND available_seats > 0;
+        `;
+        db.query(updateSeatsQuery, [trainId], (err, result) => {
+          if (err || result.affectedRows === 0) {
             return db.rollback(() => {
-              console.error("Error inserting reservation:", err);
-              return res
-                .status(500)
-                .json({ error: "Error processing booking" });
+              console.error("Error updating seats or no available seats:", err);
+              return res.status(400).json({ error: "No available seats or error updating seats" });
             });
           }
 
-          // Commit the transaction
-          db.commit((err) => {
-            if (err) {
-              return db.rollback(() => {
-                console.error("Error committing transaction:", err);
-                return res
-                  .status(500)
-                  .json({ error: "Booking transaction failed" });
+          // Insert the booking information into the reservations table
+          const insertReservationQuery = `
+            INSERT INTO reservations (user_id, schedule_id, passenger_name, age, seat_type)
+            VALUES (?, ?, ?, ?, ?);
+          `;
+          db.query(
+            insertReservationQuery,
+            [userId, scheduleId, passengerName, age, seatType],
+            (err, result) => {
+              if (err) {
+                return db.rollback(() => {
+                  console.error("Error inserting reservation:", err);
+                  return res.status(500).json({ error: "Error processing booking" });
+                });
+              }
+
+              // Commit the transaction
+              db.commit((err) => {
+                if (err) {
+                  return db.rollback(() => {
+                    console.error("Error committing transaction:", err);
+                    return res.status(500).json({ error: "Booking transaction failed" });
+                  });
+                }
+                res.json({ success: true, message: "Ticket booked successfully" });
               });
             }
-            res.json({ success: true, message: "Ticket booked successfully" });
-          });
-        }
-      );
+          );
+        });
+      });
     });
-  });
+  } catch (error) {
+    console.error("Invalid token:", error);
+    return res.status(401).json({ error: "Invalid token" });
+  }
 });
+
+
 
 // Endpoint to retrieve all bookings for a user
 app.get("/my-bookings", (req, res) => {

@@ -37,12 +37,20 @@ function BookTicket() {
       return;
     }
 
+    // console.log("token in frontend ",JSON.parse(localStorage.getItem('token')))
+
     // Attempt to send booking request to the backend
     try {
       const response = await axios.post(
         `http://localhost:5000/book-ticket/${trainId}`,
-        formData
+        formData,
+        {
+          headers: {
+            'x-auth-token': localStorage.getItem('token'), 
+          }
+        }
       );
+      
 
       // Handle successful booking response
       if (response.status === 200) {
