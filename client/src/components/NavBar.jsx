@@ -25,6 +25,12 @@ function NavBar({ isLoggedIn, onLogout }) {
             <Link to="/search-trains" className="hover:underline">
               Search Trains
             </Link>
+            <Link to="/my-bookings" className="hover:underline">
+              My Bookings
+            </Link>
+            <Link to="/profile" className="hover:underline">
+              Profile
+            </Link>
             <Link to="/" className="hover:underline">
               Home
             </Link>

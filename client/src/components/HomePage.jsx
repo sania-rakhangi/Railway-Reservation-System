@@ -1,6 +1,18 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 function HomePage() {
+  // State to check if the user is logged in
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    // Simulate checking local storage or an API to confirm user login status
+    const userToken = localStorage.getItem("token"); // Assuming a token is stored upon login
+    if (userToken) {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
   return (
     <div className="bg-gray-100 min-h-screen flex flex-col items-center">
       <header className="w-full bg-blue-600 text-white py-8 text-center">
@@ -47,34 +59,36 @@ function HomePage() {
           </ul>
         </section>
 
-        <section
-          className="bg-white shadow-lg rounded-lg p-6 w-full text-center"
-          aria-labelledby="get-started-section"
-        >
-          <h2
-            id="get-started-section"
-            className="text-2xl font-semibold mb-4 text-gray-800"
+        {!isLoggedIn && (
+          <section
+            className="bg-white shadow-lg rounded-lg p-6 w-full text-center"
+            aria-labelledby="get-started-section"
           >
-            Get Started
-          </h2>
-          <p className="text-gray-600 mb-4">
-            Sign up or log in to begin booking your tickets!
-          </p>
-          <div className="flex justify-center space-x-4">
-            <Link
-              to="/signup"
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <h2
+              id="get-started-section"
+              className="text-2xl font-semibold mb-4 text-gray-800"
             >
-              Sign Up
-            </Link>
-            <Link
-              to="/login"
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              Log In
-            </Link>
-          </div>
-        </section>
+              Get Started
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Sign up or log in to begin booking your tickets!
+            </p>
+            <div className="flex justify-center space-x-4">
+              <Link
+                to="/signup"
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Sign Up
+              </Link>
+              <Link
+                to="/login"
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                Log In
+              </Link>
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );

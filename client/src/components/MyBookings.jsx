@@ -4,10 +4,9 @@ import axios from "axios";
 function MyBookings() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const fetchBookings = async () => {
     try {
-      const userId = localStorage.getItem("userId"); // Ensure secure handling in production
+      const userId = localStorage.getItem("userId");
 
       if (!userId) {
         alert("User not logged in");
@@ -15,7 +14,7 @@ function MyBookings() {
       }
 
       const response = await axios.get("http://localhost:5000/my-bookings", {
-        params: { userId },
+        params: { user_id: userId },
       });
 
       if (response.data && response.data.bookings) {

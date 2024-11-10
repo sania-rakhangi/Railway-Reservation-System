@@ -90,7 +90,12 @@ app.post("/login", (req, res) => {
         expiresIn: "1h",
       });
 
-      res.json({ message: "Login successful", token });
+      // Send both the token and userId in the response
+      res.json({
+        message: "Login successful",
+        token,
+        userId: user.user_id, // Include userId in the response
+      });
     }
   );
 });
@@ -125,21 +130,28 @@ app.get("/search-trains", (req, res) => {
 // Endpoint to book a ticket
 app.post("/book-ticket/:trainId", (req, res) => {
   const { trainId } = req.params;
+  console.log("Received trainId in backend:", trainId);
   const { passengerName, age, seatType } = req.body;
-  const token = req.header('x-auth-token');
+  const token = req.header("x-auth-token");
 
   if (!token) {
     return res.status(401).json({ error: "No token provided" });
   }
 
-  // console.log("Booking parameters:", trainId, passengerName, age, seatType)
   console.log("Token:", token);
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
 
-    console.log("Booking parameters:", decoded, trainId, passengerName, age, seatType);
+    console.log(
+      "Booking parameters:",
+      decoded,
+      trainId,
+      passengerName,
+      age,
+      seatType
+    );
 
     // Begin a transaction
     db.beginTransaction((err) => {
@@ -156,7 +168,9 @@ app.post("/book-ticket/:trainId", (req, res) => {
         if (err || scheduleResults.length === 0) {
           return db.rollback(() => {
             console.error("Error fetching schedule or no schedule found:", err);
-            return res.status(400).json({ error: "No schedule found for the specified train" });
+            return res
+              .status(400)
+              .json({ error: "No schedule found for the specified train" });
           });
         }
 
@@ -172,23 +186,27 @@ app.post("/book-ticket/:trainId", (req, res) => {
           if (err || result.affectedRows === 0) {
             return db.rollback(() => {
               console.error("Error updating seats or no available seats:", err);
-              return res.status(400).json({ error: "No available seats or error updating seats" });
+              return res
+                .status(400)
+                .json({ error: "No available seats or error updating seats" });
             });
           }
 
-          // Insert the booking information into the reservations table
+          // Insert the booking information into the reservations table, including train_id
           const insertReservationQuery = `
-            INSERT INTO reservations (user_id, schedule_id, passenger_name, age, seat_type)
-            VALUES (?, ?, ?, ?, ?);
+            INSERT INTO reservations (user_id, schedule_id, passenger_name, age, seat_type, train_id)
+            VALUES (?, ?, ?, ?, ?, ?);
           `;
           db.query(
             insertReservationQuery,
-            [userId, scheduleId, passengerName, age, seatType],
+            [userId, scheduleId, passengerName, age, seatType, trainId], // trainId is explicitly passed here
             (err, result) => {
               if (err) {
                 return db.rollback(() => {
                   console.error("Error inserting reservation:", err);
-                  return res.status(500).json({ error: "Error processing booking" });
+                  return res
+                    .status(500)
+                    .json({ error: "Error processing booking" });
                 });
               }
 
@@ -197,10 +215,16 @@ app.post("/book-ticket/:trainId", (req, res) => {
                 if (err) {
                   return db.rollback(() => {
                     console.error("Error committing transaction:", err);
-                    return res.status(500).json({ error: "Booking transaction failed" });
+                    return res
+                      .status(500)
+                      .json({ error: "Booking transaction failed" });
                   });
                 }
-                res.json({ success: true, message: "Ticket booked successfully" });
+                res.json({
+                  success: true,
+                  message: "Ticket booked successfully",
+                  reservationId: result.insertId, // Return reservation ID if needed
+                });
               });
             }
           );
@@ -213,13 +237,11 @@ app.post("/book-ticket/:trainId", (req, res) => {
   }
 });
 
-
-
 // Endpoint to retrieve all bookings for a user
 app.get("/my-bookings", (req, res) => {
-  const { userId } = req.query; // User ID from query parameters
+  const { user_id } = req.query; // User ID from query parameters
 
-  if (!userId) {
+  if (!user_id) {
     return res.status(400).json({ error: "User ID is required" });
   }
 
@@ -234,7 +256,7 @@ app.get("/my-bookings", (req, res) => {
       WHERE r.user_id = ?;
     `;
 
-  db.query(query, [userId], (err, results) => {
+  db.query(query, [user_id], (err, results) => {
     if (err) {
       console.error("Error retrieving bookings:", err);
       return res.status(500).json({ error: "Database error" });
@@ -280,6 +302,56 @@ app.delete("/cancel-booking/:reservationId", (req, res) => {
 
       res.json({ success: true, message: "Booking cancelled successfully" });
     });
+  });
+});
+
+// Route to get user details
+app.get("/profile", (req, res) => {
+  // Assuming the user is authenticated and their user_id is in the JWT token payload
+  const userId = req.user.id; // You should have a middleware to verify the JWT token
+
+  // Fetch the user details from the database
+  db.query(
+    "SELECT user_id, name, email FROM users WHERE user_id = ?",
+    [userId],
+    (err, results) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error" });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json(results[0]); // Return the user details
+    }
+  );
+});
+
+// Route to update user details
+app.put("/profile", (req, res) => {
+  const userId = req.user.id; // Get user_id from JWT token
+  const { name, email, password } = req.body;
+
+  // Hash the password if it is provided
+  let hashedPassword = password;
+  if (password) {
+    hashedPassword = bcrypt.hashSync(password, 10);
+  }
+
+  // Update the user details in the database
+  const query =
+    "UPDATE users SET name = ?, email = ?, password = ? WHERE user_id = ?";
+  db.query(query, [name, email, hashedPassword, userId], (err, result) => {
+    if (err) {
+      return res.status(500).json({ message: "Error updating details" });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User details updated successfully" });
   });
 });
 

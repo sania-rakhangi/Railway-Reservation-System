@@ -25,8 +25,9 @@ function LoginForm({ onLogin }) {
         "http://localhost:5000/login",
         formData
       );
-      const { token } = response.data;
+      const { token, userId } = response.data; // Ensure the response contains userId
       localStorage.setItem("token", token); // Store JWT in localStorage
+      localStorage.setItem("userId", userId); // Store userId in localStorage
       onLogin(token); // Call onLogin passed as prop
       navigate("/"); // Redirect to home page
     } catch (error) {
