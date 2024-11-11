@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
 
 const ProfilePage = () => {
   const [userDetails, setUserDetails] = useState({
@@ -11,17 +10,19 @@ const ProfilePage = () => {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
-    // Fetch the user details when the component mounts
     const fetchUserDetails = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/profile", {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
+        const userId = localStorage.getItem("userId");
+        if (!userId) {
+          setError("User ID not found.");
+          return;
+        }
+
+        const response = await axios.get(
+          `http://localhost:5000/profile?userId=${userId}`
+        );
         setUserDetails({
           name: response.data.name,
           email: response.data.email,
@@ -29,16 +30,12 @@ const ProfilePage = () => {
         });
       } catch (error) {
         setError("Error fetching profile details.");
-        // Optionally, redirect if there's an error (e.g., token expired or invalid)
-        if (error.response?.status === 401) {
-          localStorage.removeItem("token");
-          navigate("/login");
-        }
+        console.log(error);
       }
     };
 
     fetchUserDetails();
-  }, [navigate]);
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -46,28 +43,37 @@ const ProfilePage = () => {
   };
 
   const handleEditToggle = () => {
+    // When entering edit mode, clear the input fields
+    if (!editing) {
+      setUserDetails({
+        name: "",
+        email: "",
+        password: "",
+      });
+    }
     setEditing(!editing);
+    setMessage(null); // Clear any previous messages
+    setError(null); // Clear any previous errors
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Remove password field if it's empty and we're not editing it
       const updatedDetails = { ...userDetails };
       if (!updatedDetails.password) {
         delete updatedDetails.password;
       }
 
-      await axios.put("http://localhost:5000/profile", updatedDetails, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      const userId = localStorage.getItem("userId");
+      await axios.put(
+        `http://localhost:5000/profile?userId=${userId}`,
+        updatedDetails
+      );
       setMessage("Profile updated successfully");
-      setEditing(false);
+      setEditing(false); // Disable editing mode after save
     } catch (error) {
       setError("Error updating profile.");
-      console.error(error); // Log the full error to the console for debugging
+      console.error(error);
     }
   };
 
@@ -86,8 +92,10 @@ const ProfilePage = () => {
             name="name"
             value={userDetails.name}
             onChange={handleChange}
-            disabled={!editing}
-            className="w-full p-2 border rounded-md"
+            readOnly={!editing}
+            className={`w-full p-2 border rounded-md ${
+              !editing ? "bg-gray-200" : "bg-white"
+            }`}
             required
           />
         </div>
@@ -99,8 +107,10 @@ const ProfilePage = () => {
             name="email"
             value={userDetails.email}
             onChange={handleChange}
-            disabled={!editing}
-            className="w-full p-2 border rounded-md"
+            readOnly={!editing}
+            className={`w-full p-2 border rounded-md ${
+              !editing ? "bg-gray-200" : "bg-white"
+            }`}
             required
           />
         </div>
@@ -112,8 +122,10 @@ const ProfilePage = () => {
             name="password"
             value={userDetails.password}
             onChange={handleChange}
-            disabled={!editing}
-            className="w-full p-2 border rounded-md"
+            readOnly={!editing}
+            className={`w-full p-2 border rounded-md ${
+              !editing ? "bg-gray-200" : "bg-white"
+            }`}
           />
         </div>
 

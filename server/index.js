@@ -307,8 +307,11 @@ app.delete("/cancel-booking/:reservationId", (req, res) => {
 
 // Route to get user details
 app.get("/profile", (req, res) => {
-  // Assuming the user is authenticated and their user_id is in the JWT token payload
-  const userId = req.user.id; // You should have a middleware to verify the JWT token
+  const { userId } = req.query; // Get userId from query parameters
+
+  if (!userId) {
+    return res.status(400).json({ message: "User ID is required" });
+  }
 
   // Fetch the user details from the database
   db.query(
@@ -330,19 +333,25 @@ app.get("/profile", (req, res) => {
 
 // Route to update user details
 app.put("/profile", (req, res) => {
-  const userId = req.user.id; // Get user_id from JWT token
+  const { userId } = req.query; // Get userId from query parameters
   const { name, email, password } = req.body;
 
-  // Hash the password if it is provided
-  let hashedPassword = password;
-  if (password) {
-    hashedPassword = bcrypt.hashSync(password, 10);
+  if (!userId) {
+    return res.status(400).json({ message: "User ID is required" });
   }
 
-  // Update the user details in the database
-  const query =
-    "UPDATE users SET name = ?, email = ?, password = ? WHERE user_id = ?";
-  db.query(query, [name, email, hashedPassword, userId], (err, result) => {
+  // Hash the password if it is provided
+  let hashedPassword = password ? bcrypt.hashSync(password, 10) : null;
+
+  // Update the user details in the database, checking if password is provided
+  const query = hashedPassword
+    ? "UPDATE users SET name = ?, email = ?, password = ? WHERE user_id = ?"
+    : "UPDATE users SET name = ?, email = ? WHERE user_id = ?";
+  const values = hashedPassword
+    ? [name, email, hashedPassword, userId]
+    : [name, email, userId];
+
+  db.query(query, values, (err, result) => {
     if (err) {
       return res.status(500).json({ message: "Error updating details" });
     }
